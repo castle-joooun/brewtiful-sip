@@ -4,6 +4,7 @@ import com.brewtifulsip.common.dto.ErrorResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -28,6 +29,12 @@ public class GlobalExceptionHandler {
                 : ErrorCode.INVALID_INPUT.getDefaultMessage();
         return ResponseEntity.status(ErrorCode.INVALID_INPUT.getStatus())
                 .body(ErrorResponse.of(ErrorCode.INVALID_INPUT, message));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
+        return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getStatus())
+                .body(ErrorResponse.of(ErrorCode.UNAUTHORIZED, "필수 인증 헤더가 없습니다: " + e.getHeaderName()));
     }
 
     @ExceptionHandler(Exception.class)
