@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:brewtiful;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none   # 스캐폴딩 단계: 엔티티 없음. 컨텍스트 로드만 확인.
+  flyway:
+    enabled: false     # V1 스키마는 MySQL 전용 문법. 테스트는 H2라 비활성.
+
+brewtiful:
+  master-code: test-master-code
