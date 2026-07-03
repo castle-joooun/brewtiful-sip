@@ -28,7 +28,7 @@ CREATE TABLE menu (
 
 CREATE TABLE orders (
     id          BIGINT      NOT NULL AUTO_INCREMENT,
-    order_token CHAR(36)    NOT NULL,
+    order_token VARCHAR(36) NOT NULL,
     status      VARCHAR(20) NOT NULL,
     ready_at    DATETIME(6) NULL,
     created_at  DATETIME(6) NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE order_item (
 CREATE TABLE review (
     id            BIGINT       NOT NULL AUTO_INCREMENT,
     order_item_id BIGINT       NOT NULL,
-    rating        TINYINT      NOT NULL,
+    rating        INT          NOT NULL,
     content       VARCHAR(500) NULL,
     created_at    DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
