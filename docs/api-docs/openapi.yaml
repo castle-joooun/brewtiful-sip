@@ -1,0 +1,441 @@
+openapi: 3.0.3
+info:
+  title: brewtiful-sip API (Phase 1 — MVP)
+  version: 0.1.0
+  description: >
+    홈카페 QR 주문 서비스 Phase 1 REST API 초안.
+    관련 문서: docs/기능명세서.md, docs/ERD.md, docs/decisions.md.
+    엔티티는 직접 노출하지 않고 아래 스키마(DTO)로 매핑한다.
+
+    미결(별도 결정 필요):
+    - 운영자(Owner) 인증 방식: PATCH /orders/{orderId}/status 의 보안 스킴 미정.
+    - 실시간 알림(SSE/WebSocket): 명세 3.4/3.5. 스트리밍 특성상 OpenAPI 표현이
+      제한적이라 문단 설명 수준으로만 기재하고 상세는 별도 문서로 관리한다.
+
+servers:
+  - url: http://localhost:8080
+    description: 로컬(Docker Compose)
+
+tags:
+  - name: bean
+    description: 원두 조회 (ADR-0002 — DB 관리 + 조회 API)
+  - name: menu
+    description: 메뉴 조회
+  - name: order
+    description: 주문 생성/조회/상태변경
+  - name: review
+    description: 메뉴(주문 항목) 단위 리뷰
+
+paths:
+  /beans:
+    get:
+      tags: [bean]
+      summary: 원두 목록 조회
+      description: 노출 가능한(active=true) 원두만 반환한다.
+      operationId: listBeans
+      responses:
+        "200":
+          description: 원두 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BeanResponse"
+
+  /menus:
+    get:
+      tags: [menu]
+      summary: 메뉴 목록 조회
+      description: 판매중(active=true) 메뉴만 반환한다.
+      operationId: listMenus
+      responses:
+        "200":
+          description: 메뉴 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MenuResponse"
+
+  /orders:
+    post:
+      tags: [order]
+      summary: 주문 생성
+      description: >
+        한 주문에 1개 이상의 항목을 담는다(장바구니). 서버는 orderToken(UUID)을 발급하고,
+        이후 주문 조회/리뷰 작성은 이 토큰으로 인증한다.
+        원두 선택이 필요한 메뉴(requiresBean=true)는 beanId가 필수이며,
+        그 외 메뉴에 beanId를 보내면 검증 오류(400)를 반환한다.
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCreateRequest"
+      responses:
+        "201":
+          description: 생성된 주문
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderCreatedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: 존재하지 않는 메뉴/원두, 또는 품절 원두 선택
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/{orderId}:
+    get:
+      tags: [order]
+      summary: 주문 상세/상태 조회
+      description: orderToken 소지자만 조회 가능하다.
+      operationId: getOrder
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+        - $ref: "#/components/parameters/OrderTokenQuery"
+      responses:
+        "200":
+          description: 주문 상세
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orders/{orderId}/status:
+    patch:
+      tags: [order]
+      summary: 주문 상태 변경 (운영자)
+      description: >
+        운영자가 주문 상태를 변경한다(예: READY 처리). READY 전이 시점을 readyAt에 기록한다.
+        NOTE: 운영자 인증 방식은 아직 미정이므로 securityScheme을 지정하지 않는다(별도 결정 필요).
+      operationId: changeOrderStatus
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusChangeRequest"
+      responses:
+        "200":
+          description: 변경된 주문 상태
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 허용되지 않는 상태 전이
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /order-items/{orderItemId}/reviews:
+    post:
+      tags: [review]
+      summary: 리뷰 작성 (메뉴/주문 항목 단위)
+      description: >
+        제약(도메인 규칙, Service 계층 검증):
+        (1) 대상 주문의 상태가 READY 이후일 것,
+        (2) READY 시점(readyAt)으로부터 3일 이내,
+        (3) 해당 주문 항목당 리뷰 1건(중복 불가),
+        (4) orderToken 소지자만 작성 가능.
+      operationId: createReview
+      parameters:
+        - $ref: "#/components/parameters/OrderItemIdPath"
+        - $ref: "#/components/parameters/OrderTokenQuery"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewCreateRequest"
+      responses:
+        "201":
+          description: 생성된 리뷰
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 작성 불가(READY 이전 / 기간 초과 / 이미 리뷰 존재)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /reviews:
+    get:
+      tags: [review]
+      summary: 리뷰 목록 조회
+      description: menuId 지정 시 해당 메뉴의 리뷰만(메뉴별 모아보기), 미지정 시 전체를 반환한다.
+      operationId: listReviews
+      parameters:
+        - name: menuId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 리뷰 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewResponse"
+
+components:
+  parameters:
+    OrderIdPath:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    OrderItemIdPath:
+      name: orderItemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    OrderTokenQuery:
+      name: token
+      in: query
+      required: true
+      description: 주문 생성 시 발급된 orderToken(UUID)
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청(검증 실패)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: 토큰 불일치/누락
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [RECEIVED, PREPARING, READY]
+
+    BeanResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          example: 에티오피아 예가체프
+        origin:
+          type: string
+          example: 에티오피아
+        roastLevel:
+          type: string
+          example: 미디엄
+        process:
+          type: string
+          example: 워시드
+        flavorNotes:
+          type: string
+          example: 자스민, 레몬, 홍차
+
+    MenuResponse:
+      type: object
+      required: [id, name, price, requiresBean]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          example: 브루잉 커피
+        price:
+          type: integer
+          description: 판매가(원)
+          example: 5000
+        requiresBean:
+          type: boolean
+          description: 원두 선택이 필요한 메뉴 여부
+
+    OrderCreateRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderItemCreateRequest"
+
+    OrderItemCreateRequest:
+      type: object
+      required: [menuId, quantity]
+      properties:
+        menuId:
+          type: integer
+          format: int64
+        beanId:
+          type: integer
+          format: int64
+          nullable: true
+          description: requiresBean=true 메뉴만 필수. 그 외에는 생략.
+        quantity:
+          type: integer
+          minimum: 1
+          example: 1
+
+    OrderCreatedResponse:
+      type: object
+      required: [orderId, orderToken, status]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        orderToken:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+
+    OrderDetailResponse:
+      type: object
+      required: [orderId, status, items]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        readyAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 준비완료(READY) 시각. 미완료 시 null.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemResponse"
+
+    OrderItemResponse:
+      type: object
+      required: [orderItemId, menuName, quantity, unitPrice, reviewed]
+      properties:
+        orderItemId:
+          type: integer
+          format: int64
+        menuName:
+          type: string
+        beanName:
+          type: string
+          nullable: true
+          description: 원두 선택 메뉴만 값 존재.
+        quantity:
+          type: integer
+        unitPrice:
+          type: integer
+          description: 주문 시점 단가 스냅샷(원)
+        reviewed:
+          type: boolean
+          description: 이미 리뷰가 작성된 항목인지 여부
+
+    OrderStatusChangeRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+
+    ReviewCreateRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        content:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    ReviewResponse:
+      type: object
+      required: [reviewId, orderItemId, menuId, menuName, rating, createdAt]
+      properties:
+        reviewId:
+          type: integer
+          format: int64
+        orderItemId:
+          type: integer
+          format: int64
+        menuId:
+          type: integer
+          format: int64
+        menuName:
+          type: string
+        rating:
+          type: integer
+        content:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      description: 전역 @ControllerAdvice 공통 에러 포맷
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: INVALID_BEAN_SELECTION
+        message:
+          type: string
+          example: 원두 선택이 필요한 메뉴입니다.
+        timestamp:
+          type: string
+          format: date-time
