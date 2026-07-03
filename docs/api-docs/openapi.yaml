@@ -7,8 +7,14 @@ info:
     관련 문서: docs/기능명세서.md, docs/ERD.md, docs/decisions.md.
     엔티티는 직접 노출하지 않고 아래 스키마(DTO)로 매핑한다.
 
-    미결(별도 결정 필요):
-    - 운영자(Owner) 인증 방식: PATCH /orders/{orderId}/status 의 보안 스킴 미정.
+    인증(Phase 1):
+    - 운영자(Owner): 고정 마스터 코드를 X-Master-Code 헤더로 전송(ADR-0003).
+      코드 값은 설정/환경변수로 외부화하며 서버에서 상수시간 비교한다.
+    - 손님(주문 항목 리뷰 작성): 주문 생성 시 발급한 orderToken을 X-Order-Token 헤더로 전송.
+    - 예외: 손님 주문상태 조회(GET /orders/{orderId})는 공유 가능한 링크 설계(명세 3.3)를
+      위해 token을 쿼리 파라미터로 유지한다.
+
+    미결/참고:
     - 실시간 알림(SSE/WebSocket): 명세 3.4/3.5. 스트리밍 특성상 OpenAPI 표현이
       제한적이라 문단 설명 수준으로만 기재하고 상세는 별도 문서로 관리한다.
 
@@ -118,8 +124,10 @@ paths:
       summary: 주문 상태 변경 (운영자)
       description: >
         운영자가 주문 상태를 변경한다(예: READY 처리). READY 전이 시점을 readyAt에 기록한다.
-        NOTE: 운영자 인증 방식은 아직 미정이므로 securityScheme을 지정하지 않는다(별도 결정 필요).
+        인증: X-Master-Code 헤더(ADR-0003).
       operationId: changeOrderStatus
+      security:
+        - MasterCode: []
       parameters:
         - $ref: "#/components/parameters/OrderIdPath"
       requestBody:
@@ -137,6 +145,8 @@ paths:
                 $ref: "#/components/schemas/OrderDetailResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -157,9 +167,10 @@ paths:
         (3) 해당 주문 항목당 리뷰 1건(중복 불가),
         (4) orderToken 소지자만 작성 가능.
       operationId: createReview
+      security:
+        - OrderToken: []
       parameters:
         - $ref: "#/components/parameters/OrderItemIdPath"
-        - $ref: "#/components/parameters/OrderTokenQuery"
       requestBody:
         required: true
         content:
@@ -210,6 +221,18 @@ paths:
                   $ref: "#/components/schemas/ReviewResponse"
 
 components:
+  securitySchemes:
+    MasterCode:
+      type: apiKey
+      in: header
+      name: X-Master-Code
+      description: 운영자 고정 마스터 코드(ADR-0003). 설정/환경변수로 외부화.
+    OrderToken:
+      type: apiKey
+      in: header
+      name: X-Order-Token
+      description: 주문 생성 시 발급된 orderToken(UUID)
+
   parameters:
     OrderIdPath:
       name: orderId
