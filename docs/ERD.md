@@ -93,6 +93,9 @@ erDiagram
 - `OrderItem` 1 — 0..1 `Review`: 항목당 리뷰 최대 1건. `Review.order_item_id`에 **UNIQUE**를
   걸어 "1 주문항목 1리뷰" 제약을 DB 레벨로 강제한다 (Service 검증 + DB 제약 이중 방어).
 
+> 물리 테이블 네이밍: `Order`는 MySQL 예약어라 테이블명은 `orders`를 사용한다
+> (`V1__init.sql`). 나머지 테이블/컬럼은 엔티티명·속성명의 snake_case와 동일하다.
+
 ## 5. 인덱스 후보
 
 | 테이블 | 컬럼 | 종류 | 목적 |
