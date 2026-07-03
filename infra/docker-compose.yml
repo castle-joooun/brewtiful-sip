@@ -1,0 +1,26 @@
+# 로컬 개발용 MySQL (Phase 1). application-local.yml 과 접속 정보가 일치해야 한다.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: brewtiful-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: brewtiful
+      MYSQL_USER: brewtiful
+      MYSQL_PASSWORD: brewtiful
+      TZ: Asia/Seoul
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    ports:
+      - "3306:3306"
+    volumes:
+      - brewtiful-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  brewtiful-mysql-data:
