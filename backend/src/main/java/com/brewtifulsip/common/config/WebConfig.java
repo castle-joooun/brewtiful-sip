@@ -19,8 +19,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 운영자 전용: 주문 상태 변경(PATCH /orders/{id}/status)과 대시보드 SSE(GET /orders/stream)
+        // 운영자 전용 경로: 상태 변경, 대시보드 SSE, 미완료 주문 목록
         registry.addInterceptor(ownerAuthInterceptor)
-                .addPathPatterns("/orders/*/status", "/orders/stream");
+                .addPathPatterns("/orders/*/status", "/orders/stream", "/orders/pending");
     }
 }

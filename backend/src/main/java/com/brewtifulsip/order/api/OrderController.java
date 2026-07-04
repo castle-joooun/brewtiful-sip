@@ -4,8 +4,10 @@ import com.brewtifulsip.order.dto.OrderCreateRequest;
 import com.brewtifulsip.order.dto.OrderCreatedResponse;
 import com.brewtifulsip.order.dto.OrderDetailResponse;
 import com.brewtifulsip.order.dto.OrderStatusChangeRequest;
+import com.brewtifulsip.order.dto.OrderSummaryResponse;
 import com.brewtifulsip.order.service.OrderService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -31,6 +33,12 @@ public class OrderController {
     @ResponseStatus(HttpStatus.CREATED)
     public OrderCreatedResponse create(@Valid @RequestBody OrderCreateRequest request) {
         return orderService.createOrder(request);
+    }
+
+    // 운영자 전용: 미완료 주문 목록 (OwnerAuthInterceptor의 X-Master-Code로 보호)
+    @GetMapping("/pending")
+    public List<OrderSummaryResponse> pending() {
+        return orderService.getPendingOrders();
     }
 
     @GetMapping("/{orderId}")

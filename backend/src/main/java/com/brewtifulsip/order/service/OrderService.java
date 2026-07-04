@@ -14,6 +14,7 @@ import com.brewtifulsip.order.dto.OrderCreatedResponse;
 import com.brewtifulsip.order.dto.OrderDetailResponse;
 import com.brewtifulsip.order.dto.OrderItemCreateRequest;
 import com.brewtifulsip.order.dto.OrderItemResponse;
+import com.brewtifulsip.order.dto.OrderSummaryResponse;
 import com.brewtifulsip.order.event.OrderCreatedEvent;
 import com.brewtifulsip.order.event.OrderStatusChangedEvent;
 import com.brewtifulsip.order.repository.OrderRepository;
@@ -84,6 +85,15 @@ public class OrderService {
         eventPublisher.publishEvent(
                 new OrderStatusChangedEvent(order.getId(), order.getOrderToken(), order.getStatus()));
         return toDetail(order);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderSummaryResponse> getPendingOrders() {
+        return orderRepository
+                .findByStatusInOrderByIdDesc(List.of(OrderStatus.RECEIVED, OrderStatus.PREPARING)).stream()
+                .map(order -> new OrderSummaryResponse(
+                        order.getId(), order.getStatus(), order.getItems().size(), order.getCreatedAt()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
