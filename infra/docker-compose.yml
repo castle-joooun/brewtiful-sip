@@ -13,7 +13,7 @@ services:
       - "--character-set-server=utf8mb4"
       - "--collation-server=utf8mb4_unicode_ci"
     ports:
-      - "3306:3306"
+      - "3307:3306"   # 호스트 3307 → 컨테이너 3306 (로컬 3306 충돌 회피)
     volumes:
       - brewtiful-mysql-data:/var/lib/mysql
     healthcheck:
