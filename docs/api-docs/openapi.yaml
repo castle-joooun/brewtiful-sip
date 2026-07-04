@@ -14,9 +14,10 @@ info:
     - 예외: 손님 주문상태 조회(GET /orders/{orderId})는 공유 가능한 링크 설계(명세 3.3)를
       위해 token을 쿼리 파라미터로 유지한다.
 
-    미결/참고:
-    - 실시간 알림(SSE/WebSocket): 명세 3.4/3.5. 스트리밍 특성상 OpenAPI 표현이
-      제한적이라 문단 설명 수준으로만 기재하고 상세는 별도 문서로 관리한다.
+    실시간 스트림(SSE):
+    - 운영자 GET /orders/stream, 손님 GET /orders/{orderId}/stream 이 text/event-stream으로
+      order-created / order-status 이벤트를 push한다(명세 3.4/3.5).
+    - CORS: React 개발 서버(http://localhost:5173)에서의 호출을 허용한다.
 
 servers:
   - url: http://localhost:8080
@@ -219,6 +220,47 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ReviewResponse"
+
+  /orders/stream:
+    get:
+      tags: [order]
+      summary: 운영자 대시보드 실시간 스트림 (SSE)
+      description: >
+        신규 주문/상태 변경을 text/event-stream으로 push한다. 이벤트명: order-created, order-status.
+        X-Master-Code 헤더로 보호된다.
+      operationId: ownerOrderStream
+      security:
+        - MasterCode: []
+      responses:
+        "200":
+          description: SSE 스트림(text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /orders/{orderId}/stream:
+    get:
+      tags: [order]
+      summary: 손님 주문 상태 실시간 스트림 (SSE)
+      description: 해당 주문의 상태 변경(order-status)을 text/event-stream으로 push한다.
+      operationId: customerOrderStream
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+        - $ref: "#/components/parameters/OrderTokenQuery"
+      responses:
+        "200":
+          description: SSE 스트림(text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   securitySchemes:
