@@ -27,7 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * test 프로파일(H2)에서 동작하며, @Transactional로 각 테스트 후 롤백한다.
  */
 @ActiveProfiles("test")
-@SpringBootTest
+// 마스터 코드를 테스트 속성으로 고정한다. (OS 환경변수 BREWTIFUL_MASTER_CODE가 설정돼 있어도
+//  테스트 속성이 우선하므로, 주변 셸 환경에 흔들리지 않는다.)
+@SpringBootTest(properties = "brewtiful.master-code=test-master-code")
 @AutoConfigureMockMvc
 @Transactional
 class ApiIntegrationTest {
