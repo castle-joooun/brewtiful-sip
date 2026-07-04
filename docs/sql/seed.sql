@@ -3,6 +3,8 @@
 --   - 원두: ADR-0002 (DB 단일 출처 + GET /beans 조회 API). 품절/노출은 active 플래그.
 --   - 메뉴: 기능명세서 3.7 (SQL 또는 최소 관리자 API로 관리).
 -- 스키마 컬럼명은 docs/ERD.md 기준(snake_case). 실제 DDL은 스캐폴딩 단계에서 JPA/Flyway로 생성.
+-- 한글 깨짐 방지: 임포트 세션 charset을 utf8mb4로 고정한다.
+SET NAMES utf8mb4;
 
 -- ─────────────────────────────────────────────
 -- Bean (원두)
