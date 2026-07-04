@@ -221,6 +221,26 @@ paths:
                 items:
                   $ref: "#/components/schemas/ReviewResponse"
 
+  /orders/pending:
+    get:
+      tags: [order]
+      summary: 미완료 주문 목록 (운영자)
+      description: RECEIVED/PREPARING 상태 주문을 최신순으로 반환한다. X-Master-Code 헤더 필요.
+      operationId: pendingOrders
+      security:
+        - MasterCode: []
+      responses:
+        "200":
+          description: 미완료 주문 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /orders/stream:
     get:
       tags: [order]
@@ -323,6 +343,21 @@ components:
     OrderStatus:
       type: string
       enum: [RECEIVED, PREPARING, READY]
+
+    OrderSummaryResponse:
+      type: object
+      required: [orderId, status, itemCount]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        itemCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
 
     BeanResponse:
       type: object
