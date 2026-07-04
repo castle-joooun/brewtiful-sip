@@ -6,7 +6,6 @@ import com.brewtifulsip.common.exception.BusinessException;
 import com.brewtifulsip.common.exception.ErrorCode;
 import com.brewtifulsip.menu.domain.Menu;
 import com.brewtifulsip.menu.repository.MenuRepository;
-import com.brewtifulsip.notification.service.NotificationService;
 import com.brewtifulsip.order.domain.Order;
 import com.brewtifulsip.order.domain.OrderItem;
 import com.brewtifulsip.order.domain.OrderStatus;
@@ -15,8 +14,11 @@ import com.brewtifulsip.order.dto.OrderCreatedResponse;
 import com.brewtifulsip.order.dto.OrderDetailResponse;
 import com.brewtifulsip.order.dto.OrderItemCreateRequest;
 import com.brewtifulsip.order.dto.OrderItemResponse;
+import com.brewtifulsip.order.event.OrderCreatedEvent;
+import com.brewtifulsip.order.event.OrderStatusChangedEvent;
 import com.brewtifulsip.order.repository.OrderRepository;
 import com.brewtifulsip.review.repository.ReviewRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,18 +33,18 @@ public class OrderService {
     private final MenuRepository menuRepository;
     private final BeanRepository beanRepository;
     private final ReviewRepository reviewRepository;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public OrderService(OrderRepository orderRepository,
                         MenuRepository menuRepository,
                         BeanRepository beanRepository,
                         ReviewRepository reviewRepository,
-                        NotificationService notificationService) {
+                        ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.menuRepository = menuRepository;
         this.beanRepository = beanRepository;
         this.reviewRepository = reviewRepository;
-        this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -61,7 +63,8 @@ public class OrderService {
                     .build());
         }
         Order saved = orderRepository.save(order);
-        notificationService.notifyNewOrder(saved);
+        eventPublisher.publishEvent(
+                new OrderCreatedEvent(saved.getId(), saved.getOrderToken(), saved.getItems().size()));
         return new OrderCreatedResponse(saved.getId(), saved.getOrderToken(), saved.getStatus());
     }
 
@@ -78,7 +81,17 @@ public class OrderService {
     public OrderDetailResponse changeStatus(Long orderId, OrderStatus target) {
         Order order = findOrder(orderId);
         order.changeStatus(target);
+        eventPublisher.publishEvent(
+                new OrderStatusChangedEvent(order.getId(), order.getOrderToken(), order.getStatus()));
         return toDetail(order);
+    }
+
+    @Transactional(readOnly = true)
+    public void verifyCustomerToken(Long orderId, String token) {
+        Order order = findOrder(orderId);
+        if (!order.getOrderToken().equals(token)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
     }
 
     private Order findOrder(Long orderId) {

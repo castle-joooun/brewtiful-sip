@@ -4,14 +4,15 @@ import com.brewtifulsip.bean.repository.BeanRepository;
 import com.brewtifulsip.common.exception.BusinessException;
 import com.brewtifulsip.menu.domain.Menu;
 import com.brewtifulsip.menu.repository.MenuRepository;
-import com.brewtifulsip.notification.service.NotificationService;
 import com.brewtifulsip.order.domain.Order;
 import com.brewtifulsip.order.domain.OrderStatus;
 import com.brewtifulsip.order.dto.OrderCreateRequest;
 import com.brewtifulsip.order.dto.OrderCreatedResponse;
 import com.brewtifulsip.order.dto.OrderItemCreateRequest;
+import com.brewtifulsip.order.event.OrderCreatedEvent;
 import com.brewtifulsip.order.repository.OrderRepository;
 import com.brewtifulsip.review.repository.ReviewRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,7 +35,7 @@ class OrderServiceTest {
     @Mock private MenuRepository menuRepository;
     @Mock private BeanRepository beanRepository;
     @Mock private ReviewRepository reviewRepository;
-    @Mock private NotificationService notificationService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private OrderService orderService;
 
@@ -49,7 +50,7 @@ class OrderServiceTest {
 
         assertThat(response.status()).isEqualTo(OrderStatus.RECEIVED);
         assertThat(response.orderToken()).isNotBlank();
-        verify(notificationService).notifyNewOrder(any(Order.class));
+        verify(eventPublisher).publishEvent(any(OrderCreatedEvent.class));
     }
 
     @Test
