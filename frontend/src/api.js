@@ -36,6 +36,8 @@ export const api = {
       body: JSON.stringify({ rating, content }),
     }),
   getReviews: (menuId) => req('/reviews' + (menuId ? `?menuId=${menuId}` : '')),
+  getPendingOrders: (masterCode) =>
+    req('/orders/pending', { headers: { 'X-Master-Code': masterCode } }),
 }
 
 export const STATUS_LABEL = {

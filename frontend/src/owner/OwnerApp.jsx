@@ -22,6 +22,15 @@ export default function OwnerApp() {
       async onopen(res) {
         if (res.ok) {
           setConnected(true)
+          // 연결 시점 이전의 미완료 주문을 먼저 채운다(이후는 SSE 실시간).
+          try {
+            const pending = await api.getPendingOrders(code)
+            setOrders(
+              pending.map((o) => ({ orderId: o.orderId, status: o.status, itemCount: o.itemCount })),
+            )
+          } catch {
+            /* 목록 조회 실패는 실시간 수신에 영향 없음 */
+          }
         } else {
           setError(res.status === 401 ? '마스터 코드가 올바르지 않습니다.' : '연결에 실패했습니다.')
           ctrl.abort()
@@ -30,7 +39,11 @@ export default function OwnerApp() {
       onmessage(ev) {
         if (ev.event === 'order-created') {
           const d = JSON.parse(ev.data)
-          setOrders((o) => [{ orderId: d.orderId, status: 'RECEIVED', itemCount: d.itemCount }, ...o])
+          setOrders((o) =>
+            o.some((x) => x.orderId === d.orderId)
+              ? o
+              : [{ orderId: d.orderId, status: 'RECEIVED', itemCount: d.itemCount }, ...o],
+          )
         } else if (ev.event === 'order-status') {
           const d = JSON.parse(ev.data)
           setOrders((o) => o.map((x) => (x.orderId === d.orderId ? { ...x, status: d.status } : x)))
